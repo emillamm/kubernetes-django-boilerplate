@@ -1,0 +1,161 @@
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    app: backend
+  name: backend-web-service
+spec:
+  ports:
+  - port: 80
+    targetPort: 8000
+  selector:
+    app: backend
+    component: web-server
+  type: LoadBalancer
+---
+apiVersion: extensions/v1beta1
+kind: Deployment
+metadata:
+  labels:
+    app: backend
+  name: backend-web-deployment
+spec:
+  replicas: 1
+  template:
+    metadata:
+      labels:
+        app: backend
+        component: web-server
+    spec:
+      containers:
+      - name: backend
+        image: gcr.io/your-gid/backend:v1.0.0 # Path to your docker image
+        ports:
+        - containerPort: 8000
+        env:
+        - name: HOST
+          valueFrom:
+            configMapKeyRef:
+              name: config-vars
+              key: host
+        - name: POSTGIS_VERSION
+          valueFrom:
+            configMapKeyRef:
+              name: config-vars
+              key: postgis-version
+        - name: BROKER_HOST_ENV_NAME
+          value: BACKEND_RABBITMQ_SERVICE_SERVICE_HOST
+        - name: POSTGRES_USER
+          valueFrom:
+            secretKeyRef:
+              name: secret-vars
+              key: postgres-user
+        - name: POSTGRES_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: secret-vars
+              key: postgres-password
+        - name: POSTGRES_DB
+          valueFrom:
+            configMapKeyRef:
+              name: config-vars
+              key: postgres-db
+        - name: POSTGRES_HOST_ENV_NAME
+          value: POSTGRES_SERVICE_SERVICE_HOST
+        resources:
+          limits:
+            cpu: 50m
+            memory: 1024Mi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    app: backend
+  name: backend-rabbitmq-service
+spec:
+  ports:
+  - port: 5672
+  selector:
+    app: backend
+    component: rabbitmq
+---
+apiVersion: extensions/v1beta1
+kind: Deployment
+metadata:
+  labels:
+    app: backend
+  name: backend-rabbitmq-deployment
+spec:
+  replicas: 1
+  template:
+    metadata:
+      labels:
+        app: backend
+        component: rabbitmq
+    spec:
+      containers:
+      - name: rabbitmq
+        image: rabbitmq
+        ports:
+        - containerPort: 5672
+        resources:
+          limits:
+            cpu: 50m
+            memory: "128Mi"
+---
+apiVersion: extensions/v1beta1
+kind: Deployment
+metadata:
+  labels:
+    app: backend
+  name: backend-celery-deployment
+spec:
+  replicas: 1
+  template:
+    metadata:
+      labels:
+        app: backend
+        component: celery
+    spec:
+      containers:
+      - name: backend
+        image: gcr.io/your-gid/backend:v1.0.0 # Path to your docker image
+        ports:
+        - containerPort: 5672
+        env:
+        - name: HOST
+          valueFrom:
+            configMapKeyRef:
+              name: config-vars
+              key: host
+        - name: POSTGIS_VERSION
+          valueFrom:
+            configMapKeyRef:
+              name: config-vars
+              key: postgis-version
+        - name: BROKER_HOST_ENV_NAME
+          value: BACKEND_RABBITMQ_SERVICE_SERVICE_HOST
+        - name: POSTGRES_USER
+          valueFrom:
+            secretKeyRef:
+              name: secret-vars
+              key: postgres-user
+        - name: POSTGRES_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: secret-vars
+              key: postgres-password
+        - name: POSTGRES_DB
+          valueFrom:
+            configMapKeyRef:
+              name: config-vars
+              key: postgres-db
+        - name: POSTGRES_HOST_ENV_NAME
+          value: POSTGRES_SERVICE_SERVICE_HOST
+        - name: IS_WORKER
+          value: "true"
+        resources:
+          limits:
+            cpu: 50m
+            memory: "128Mi"

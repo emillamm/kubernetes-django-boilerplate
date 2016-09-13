@@ -1,0 +1,2 @@
+# this file should act as an alias for the production requirements
+-r ./requirements/production.txt
